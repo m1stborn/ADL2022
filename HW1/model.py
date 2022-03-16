@@ -69,14 +69,17 @@ class SlotClassifier(torch.nn.Module):
     ) -> None:
         super(SlotClassifier, self).__init__()
         self.embed = Embedding.from_pretrained(embeddings, freeze=False)
+        self.emb_ln = nn.LayerNorm(300)
 
-        self.rnn = nn.GRU(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
-        # self.rnn = nn.LSTM(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
-        self.linear = nn.Linear(hidden_size * 2, 64)
+        # self.rnn = nn.GRU(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
+        self.rnn = nn.LSTM(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
+        self.lstm_ln = nn.LayerNorm(hidden_size * 2)
+
+        # self.linear = nn.Linear(hidden_size * 2, 64)
         # self.linear = nn.Linear(hidden_size * 2, num_class)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
-        self.out = nn.Linear(64, num_class)
+        self.out = nn.Linear(hidden_size * 2, num_class)
 
     @property
     def encoder_output_size(self) -> int:
@@ -87,13 +90,15 @@ class SlotClassifier(torch.nn.Module):
     def forward(self, batch):
 
         h_embedding = self.embed(batch)
+        h_embedding = self.emb_ln(h_embedding)
+
         rnn_out, _ = self.rnn(h_embedding, None)
         # batch_size x L x hidden_size*2
+        rnn_out = self.lstm_ln(rnn_out)
 
-        out = self.linear(rnn_out)
+        # out = self.linear(rnn_out)
         # batch_size x L x 64
-
-        out = self.relu(out)
+        out = self.relu(rnn_out)
         out = self.dropout(out)
         out = self.out(out)
 

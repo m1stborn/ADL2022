@@ -53,7 +53,7 @@ def main(args):
         dropout=0.1,
         bidirectional=True,
         num_class=9,
-        num_layers=3
+        num_layers=2
     )
     model.to(device=device)
 
@@ -166,7 +166,7 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--device", type=torch.device, help="cpu, cuda, cuda:0, cuda:1", default="cpu"
     )
-    parser.add_argument("--num_epoch", type=int, default=20)
+    parser.add_argument("--num_epoch", type=int, default=30)
 
     args = parser.parse_args()
     return args

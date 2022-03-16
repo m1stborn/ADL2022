@@ -47,7 +47,7 @@ def main(args):
         dropout=0.1,
         bidirectional=True,
         num_class=9,
-        num_layers=2
+        num_layers=3
     )
     model.to(device=device)
 
