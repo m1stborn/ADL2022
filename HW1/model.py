@@ -71,8 +71,8 @@ class SlotClassifier(torch.nn.Module):
         self.embed = Embedding.from_pretrained(embeddings, freeze=False)
         self.emb_ln = nn.LayerNorm(300)
 
-        # self.rnn = nn.GRU(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
         self.rnn = nn.LSTM(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
+        # self.rnn = nn.LSTM(300, hidden_size, num_layers, bidirectional=bidirectional, batch_first=True)
         self.lstm_ln = nn.LayerNorm(hidden_size * 2)
 
         # self.linear = nn.Linear(hidden_size * 2, 64)
@@ -113,12 +113,12 @@ if __name__ == '__main__':
     linear2 = nn.Linear(64, 9)
 
     inputs = torch.randn(3, 10, 300)
-    outputs, _ = rnn(inputs, None)
-    outputs = linear(outputs)
-    outputs = relu(outputs)
-    outputs = dropout(outputs)
-    outputs = linear2(outputs)
-    print(outputs.size())
+    outputs, outputs2 = rnn(inputs, None)
+    # outputs = linear(outputs)
+    # outputs = relu(outputs)
+    # outputs = dropout(outputs)
+    # outputs = linear2(outputs)
+    print(outputs.size(), outputs2[0].size())
     # loss_function_1 = nn.CrossEntropyLoss(ignore_index=0)
     #
     # target = torch.empty((3, 10), dtype=torch.long).random_(9)

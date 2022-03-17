@@ -92,25 +92,22 @@ def main(args):
         # Print Evaluation Statistic
         model.eval()
         with torch.no_grad():
-            correct = 0
-            total = 0
+            correct, total, valid_loss = 0, 0, 0.0
+
             for i, data in enumerate(valid_dataloader):
                 inputs, labels = data['tokens'].to(device), data['tags'].to(device)
                 token_lens = data['lens']
 
                 outputs = model(inputs)
                 _, predicted = torch.max(outputs.data, 2)
+
+                loss = criterion(outputs.transpose(1, 2), labels)
+                valid_loss += loss.item()
+
                 total += labels.size(0)
-
-                # print(predicted.size())
-                # print(predicted[0])
-                # print(lens)
-                # batch_tp(predicted, labels, lens)
-
                 correct += batch_tp(predicted, labels, token_lens)
-                # correct += (predicted == labels).sum().item()
 
-            print(f"Valid Acc: {correct / total:.4f}")
+            print(f"Valid Acc: {correct / total:.4f} Valid Loss: {valid_loss}")
         if pre_val_acc < (correct / total):
             checkpoint = {
                 'model': model.state_dict(),
