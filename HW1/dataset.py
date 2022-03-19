@@ -71,6 +71,7 @@ class SlotTagDataset(Dataset):
         self._idx2label = {idx: intent for intent, idx in self.label_mapping.items()}
         self.max_len = max_len
         self.pad_tag_idx = pad_tag_idx
+        self.nlp = spacy.load("en_core_web_sm")
 
     def __len__(self) -> int:
         return len(self.data)
@@ -87,6 +88,8 @@ class SlotTagDataset(Dataset):
         ids = [sample['id'] for sample in samples]
 
         tokens = [sample['tokens'] for sample in samples]
+        # tokens = [[self.nlp(word)[0].text for word in sample['tokens']] for sample in samples]
+
         encoded_tokens = self.vocab.encode_batch(tokens, to_len=self.max_len)
         lens = [len(sample['tokens']) for sample in samples]
         # Only Train and Eval data has labels

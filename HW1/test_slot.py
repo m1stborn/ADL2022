@@ -92,7 +92,7 @@ def parse_args() -> Namespace:
         "--test_file",
         type=Path,
         help="Path to the test file.",
-        # required=True,
+        required=True,
         default="./data/slot/test.json"
     )
     parser.add_argument(
