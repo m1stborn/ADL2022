@@ -65,7 +65,7 @@ def main(args):
     # print(out.size())
     # _, predicted = torch.max(out.data, 2)
     # print(predicted[0])
-    # print(batch['tags'][0])
+    # print(batch['tokens'][0])
     # print(out.size())
 
     pre_val_acc = 0.0
@@ -154,7 +154,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--bidirectional", type=bool, default=True)
 
     # optimizer
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=5e-4)
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=64)
