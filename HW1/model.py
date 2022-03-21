@@ -77,7 +77,7 @@ class SlotClassifier(torch.nn.Module):
 
         # self.linear = nn.Linear(hidden_size * 2, 64)
         # self.linear = nn.Linear(hidden_size * 2, num_class)
-        self.relu = nn.ReLU()
+        self.relu = nn.Softmax(dim=1)
         self.dropout = nn.Dropout(dropout)
         self.out = nn.Linear(hidden_size * 2, num_class)
 

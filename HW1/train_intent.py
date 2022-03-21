@@ -45,7 +45,7 @@ def main(args):
     # batch = next(iter(train_dataloader))
     # print(batch)
     # print(len(batch['text'][0]))
-    # print(batch['text'].size())
+    # print(batch['text'])
 
     # Usage of vocab
     # print(datasets[TRAIN][0])
@@ -73,8 +73,6 @@ def main(args):
     # Usage of model
     # out = model(batch['text'].to(device))
 
-    # epoch_pbar = trange(args.num_epoch, desc="Epoch")
-    # for epoch in epoch_pbar:
     pre_val_acc = 0.0
     for epoch in range(args.num_epoch):
         model.train()
@@ -121,7 +119,6 @@ def main(args):
                             os.path.join(args.ckpt_dir, "Intent-{}.pt".format(UID[:8])))
             pre_val_acc = correct / total
             print(f"Epoch {checkpoint['epoch']} saved!")
-    # TODO: Inference on test set
 
 
 def parse_args() -> Namespace:

@@ -41,9 +41,6 @@ def main(args):
     train_dataloader = DataLoader(datasets[TRAIN], batch_size=128, shuffle=True, collate_fn=datasets[TRAIN].collate_fn)
     valid_dataloader = DataLoader(datasets[DEV], batch_size=128, shuffle=True, collate_fn=datasets[DEV].collate_fn)
 
-    # Usage of dataloader
-    batch = next(iter(train_dataloader))
-
     embeddings = torch.load(args.cache_dir / "embeddings.pt")  # 6491 x 300
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
@@ -59,14 +56,6 @@ def main(args):
 
     criterion = torch.nn.CrossEntropyLoss(ignore_index=args.pad_tag_idx)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-
-    # Usage of model
-    # out = model(batch['tokens'].to(device))
-    # print(out.size())
-    # _, predicted = torch.max(out.data, 2)
-    # print(predicted[0])
-    # print(batch['tokens'][0])
-    # print(out.size())
 
     pre_val_acc = 0.0
     for epoch in range(args.num_epoch):
@@ -174,7 +163,6 @@ def batch_tp(preds: torch.Tensor, targets: torch.Tensor, lens: List[int]) -> int
     count = 0
 
     for pred, target, l in zip(pred_np, target_np, lens):
-        # print(pred[:l], target[:l], l)
         count += (pred[:l] == target[:l]).all()
 
     # return number of true positive in a batch

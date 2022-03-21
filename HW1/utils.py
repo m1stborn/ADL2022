@@ -6,12 +6,14 @@ import torch
 class Vocab:
     PAD = "[PAD]"
     UNK = "[UNK]"
+    MASK = "[MASK]"
 
     def __init__(self, vocab: Iterable[str]) -> None:
         self.token2idx = {
             Vocab.PAD: 0,
             Vocab.UNK: 1,
-            **{token: i for i, token in enumerate(vocab, 2)},
+            Vocab.MASK: 2,
+            **{token: i for i, token in enumerate(vocab, 3)},
         }
 
     @property
@@ -21,6 +23,10 @@ class Vocab:
     @property
     def unk_id(self) -> int:
         return self.token2idx[Vocab.UNK]
+
+    @property
+    def mask_id(self) -> int:
+        return self.token2idx[Vocab.MASK]
 
     @property
     def tokens(self) -> List[str]:

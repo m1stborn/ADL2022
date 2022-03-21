@@ -10,6 +10,7 @@ import torch
 from torch.utils.data import DataLoader
 from dataset import SlotTagDataset
 from model import SlotClassifier
+
 from utils import Vocab, load_checkpoint
 
 torch.manual_seed(1)

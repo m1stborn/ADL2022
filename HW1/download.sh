@@ -1,3 +1,1 @@
-# TODO: glove
-
-wget https://www.dropbox.com/s/qko2m2ohqr7rtw2/Slot-e472c610.pt?dl=1 -O Slot-e472c610.pt
+wget https://www.dropbox.com/s/jou0mv9xc53z7i4/Slot-64a3079a.pt?dl=1 -O Slot-64a3079a.pt
