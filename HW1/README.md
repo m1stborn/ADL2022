@@ -13,3 +13,15 @@ python train_intent.py
 ```shell
 python train_slot.py
 ```
+
+## Intent Classification Result
+
+| Model | Accuracy |
+|-------|----------|
+| BiGRU | 0.8902   |
+
+## Slot Tagging Result
+
+| Model  | Accuracy |
+|--------|----------|
+| BiLSTM | 0.7973   |
