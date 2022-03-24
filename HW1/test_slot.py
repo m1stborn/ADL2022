@@ -32,23 +32,13 @@ def main(args):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # model = SlotClassifier(
-    #     embeddings,
-    #     hidden_size=64,
-    #     dropout=0.1,
-    #     bidirectional=True,
-    #     num_class=9,
-    #     num_layers=3
-    # )
-    # model.to(device=device)
-
     model = SlotClassifier(
         embeddings,
-        hidden_size=512,
-        dropout=0.1,
-        bidirectional=True,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout,
+        bidirectional=args.bidirectional,
         num_class=9,
-        num_layers=2
+        num_layers=args.num_layers,
     )
     model.to(device=device)
 

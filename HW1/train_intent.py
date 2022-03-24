@@ -7,9 +7,8 @@ from pathlib import Path
 from typing import Dict
 
 import torch
-import spacy
 from torch.utils.data import DataLoader
-from tqdm import trange, tqdm
+from tqdm import tqdm
 
 from dataset import SeqClsDataset
 from utils import Vocab, save_checkpoint
@@ -41,37 +40,21 @@ def main(args):
     train_dataloader = DataLoader(datasets[TRAIN], batch_size=64, shuffle=True, collate_fn=datasets[TRAIN].collate_fn)
     valid_dataloader = DataLoader(datasets[DEV], batch_size=64, shuffle=True, collate_fn=datasets[DEV].collate_fn)
 
-    # Usage of dataloader
-    # batch = next(iter(train_dataloader))
-    # print(batch)
-    # print(len(batch['text'][0]))
-    # print(batch['text'])
-
-    # Usage of vocab
-    # print(datasets[TRAIN][0])
-    # nlp = spacy.load("en_core_web_sm")
-    # doc = nlp(datasets[TRAIN][0]["text"])
-    # tokenized = [token.text for token in doc]
-    # print(vocab.encode(tokenized))
-
     embeddings = torch.load(args.cache_dir / "embeddings.pt")  # 6491 x 300
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
     model = SeqClassifier(
         embeddings,
-        hidden_size=64,
-        dropout=0.1,
-        bidirectional=True,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout,
+        bidirectional=args.bidirectional,
         num_class=150,
-        num_layers=3
+        num_layers=args.num_layers,
     )
     model.to(device=device)
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-
-    # Usage of model
-    # out = model(batch['text'].to(device))
 
     pre_val_acc = 0.0
     for epoch in range(args.num_epoch):
@@ -146,8 +129,8 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
-    parser.add_argument("--hidden_size", type=int, default=512)
-    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--hidden_size", type=int, default=64)
+    parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--bidirectional", type=bool, default=True)
 

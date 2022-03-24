@@ -46,11 +46,11 @@ def main(args):
     print('Using device:', device)
     model = SlotClassifier(
         embeddings,
-        hidden_size=512,
-        dropout=0.1,
-        bidirectional=True,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout,
+        bidirectional=args.bidirectional,
         num_class=9,
-        num_layers=2
+        num_layers=args.num_layers,
     )
     model.to(device=device)
 
@@ -139,7 +139,7 @@ def parse_args() -> Namespace:
     # model
     parser.add_argument("--hidden_size", type=int, default=512)
     parser.add_argument("--num_layers", type=int, default=2)
-    parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--bidirectional", type=bool, default=True)
 
     # optimizer
@@ -164,8 +164,6 @@ def batch_tp(preds: torch.Tensor, targets: torch.Tensor, lens: List[int]) -> int
 
     for pred, target, l in zip(pred_np, target_np, lens):
         count += (pred[:l] == target[:l]).all()
-
-    # return number of true positive in a batch
     return count
 
 

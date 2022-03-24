@@ -1,6 +1,5 @@
 from typing import List, Dict
 
-import spacy
 import torch
 import numpy as np
 from torch.utils.data import Dataset
@@ -21,7 +20,6 @@ class SeqClsDataset(Dataset):
         self.label_mapping = label_mapping
         self._idx2label = {idx: intent for intent, idx in self.label_mapping.items()}
         self.max_len = max_len
-        # self.nlp = spacy.load("en_core_web_sm")
 
     def __len__(self) -> int:
         return len(self.data)
@@ -37,7 +35,6 @@ class SeqClsDataset(Dataset):
     def collate_fn(self, samples: List[Dict]) -> Dict:
         ids = [sample['id'] for sample in samples]
 
-        # tokens = [[token.text for token in self.nlp(sample['text'])] for sample in samples]
         tokens = [sample['text'].split(' ') for sample in samples]
         encoded_tokens = self.vocab.encode_batch(tokens, to_len=self.max_len)
 

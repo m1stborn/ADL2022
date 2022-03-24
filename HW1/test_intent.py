@@ -32,11 +32,11 @@ def main(args):
 
     model = SeqClassifier(
         embeddings,
-        hidden_size=64,
-        dropout=0.1,
-        bidirectional=True,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout,
+        bidirectional=args.bidirectional,
         num_class=150,
-        num_layers=3
+        num_layers=args.num_layers,
     )
     model.to(device)
 
@@ -94,8 +94,8 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
-    parser.add_argument("--hidden_size", type=int, default=512)
-    parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--hidden_size", type=int, default=64)
+    parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--bidirectional", type=bool, default=True)
 

@@ -1,6 +1,4 @@
-import csv
 import json
-import os.path
 import pickle
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -37,11 +35,11 @@ def main(args):
 
     model = SlotClassifier(
         embeddings,
-        hidden_size=512,
-        dropout=0.1,
-        bidirectional=True,
+        hidden_size=args.hidden_size,
+        dropout=args.dropout,
+        bidirectional=args.bidirectional,
         num_class=9,
-        num_layers=2
+        num_layers=args.num_layers,
     )
     model.to(device=device)
 
@@ -94,7 +92,7 @@ def parse_args() -> Namespace:
         "--test_file",
         type=Path,
         help="Path to the test file.",
-        # required=True,
+        required=True,
         default="./data/slot/eval.json"
     )
     parser.add_argument(
