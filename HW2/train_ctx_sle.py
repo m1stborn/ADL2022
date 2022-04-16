@@ -4,9 +4,11 @@ import uuid
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Dict
+from itertools import chain
 
 import torch
-from datasets import load_metric
+from accelerate import Accelerator
+from datasets import load_metric, load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
@@ -17,9 +19,12 @@ from transformers import (
     SchedulerType,
     get_scheduler,
     set_seed,
+    default_data_collator,
 )
 
-from dataset import CtxSleDataset, DataCollatorForMultipleChoice
+# from dataset import CtxSleDataset, DataCollatorForMultipleChoice
+from ctx_sle import CtxSleDataset
+from utils import data_collator
 
 CONTEXT = "context"
 TRAIN = "train"
@@ -30,30 +35,84 @@ UID = str(uuid.uuid1())
 
 def main(args):
     set_seed(1)
+    accelerator = Accelerator()
 
-    data_paths = {split: args.data_dir / f"{split}.json" for split in SPLITS}
-    data = {split: json.loads(path.read_text(encoding='utf-8')) for split, path in data_paths.items()}
-    context_data = data[CONTEXT]
-    # TODO: slow tokenizer
+    # data_paths = {split: args.data_dir / f"{split}.json" for split in SPLITS}
+    # data = {split: json.loads(path.read_text(encoding='utf-8')) for split, path in data_paths.items()}
+    # context_data = data[CONTEXT]
+    # # TODO: slow tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
-
-    datasets: Dict[str, ] = {
-        split: CtxSleDataset(split_data, context_data, args.max_len, tokenizer)
-        for split, split_data in data.items()
-    }
+    #
+    # datasets: Dict[str, ] = {
+    #     split: CtxSleDataset(split_data, context_data, args.max_len, tokenizer)
+    #     for split, split_data in data.items()
+    # }
 
     # print(datasets[TRAIN][0])
+    raw_train_dataset = load_dataset("ctx_sle.py", name="train", cache_dir="./cache2",
+                                     question_file="./data/train.json", context_file="./data/context.json")
 
-    data_collator = DataCollatorForMultipleChoice(
-        tokenizer, pad_to_multiple_of=8
-    )
+    raw_valid_dataset = load_dataset("ctx_sle.py", name="eval", cache_dir="./cache2",
+                                     question_file="./data/valid.json", context_file="./data/context.json")
 
-    train_dataloader = DataLoader(
-        datasets[TRAIN], shuffle=True, collate_fn=data_collator, batch_size=args.batch_size
-    )
-    eval_dataloader = DataLoader(
-        datasets[DEV], shuffle=False, collate_fn=data_collator, batch_size=32
-    )
+    ending_names = [f"ending{i}" for i in range(4)]
+    padding = "max_length"
+
+    # (Context|Question)
+    def preprocess_function(examples):
+        batch_size = len(examples["question"])
+        # Question
+        first_sentences = [[context] * 4 for context in examples["question"]]
+        # Context
+        second_sentences = [
+            [examples[end][i] for end in ending_names] for i in range(batch_size)
+        ]
+
+        labels = examples["label"]
+
+        # Flatten out
+        first_sentences = list(chain(*first_sentences))
+        second_sentences = list(chain(*second_sentences))
+
+        # Tokenize
+        tokenized_examples = tokenizer(
+            # first_sentences,
+            # second_sentences,
+            second_sentences,
+            first_sentences,
+            max_length=args.max_len,
+            padding=padding,
+            truncation="only_first",
+        )
+
+        # Un-flatten
+        tokenized_inputs = {k: [v[i: i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()}
+        tokenized_inputs["labels"] = labels
+
+        return tokenized_inputs
+
+    train_dataset = raw_train_dataset["train"]
+    with accelerator.main_process_first():
+        train_dataset = train_dataset.map(
+            preprocess_function,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+        )
+    print(train_dataset[0])
+    eval_dataset = raw_valid_dataset["validation"]
+    with accelerator.main_process_first():
+        eval_dataset = eval_dataset.map(
+            preprocess_function,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+        )
+
+    train_dataloader = DataLoader(train_dataset, shuffle=True, collate_fn=data_collator, batch_size=args.batch_size)
+
+    eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.batch_size)
+
+    # batch = next(iter(train_dataloader))
+    # print(batch)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('Using device:', device)
@@ -103,15 +162,10 @@ def main(args):
         epoch_pbar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=100)
 
         for step, batch in epoch_pbar:
-            ids = batch.pop("ids")
-            data = {k: v.to(device) for k, v in batch.items()}
+            _ = batch.pop("ids")
+            _ = batch.pop("paragraphs")
 
-            # print(data["input_ids"].size())
-            # print(data["input_ids"])
-            # print(batch["id"])
-            # for k, v in data.items():
-            #     print(k)
-            # data["labels"] = batch["label"].to(device)
+            data = {k: v.to(device) for k, v in batch.items()}
 
             outputs = model(**data)
             loss = outputs.loss
@@ -135,7 +189,8 @@ def main(args):
         # Evaluation
         model.eval()
         for step, batch in enumerate(eval_dataloader):
-            ids = batch.pop("ids")
+            _ = batch.pop("ids")
+            _ = batch.pop("paragraphs")
             data = {k: v.to(device) for k, v in batch.items()}
             with torch.no_grad():
                 outputs = model(**data)
@@ -162,6 +217,10 @@ def parse_args() -> Namespace:
         help="Directory to save the model file.",
         default="./ckpt/ctx_sle/",
     )
+    parser.add_argument(
+        "--preprocessing_num_workers", type=int, default=6,
+        help="Num worker for preprocessing"
+    )
 
     # data
     parser.add_argument("--max_len", type=int, default=384)
@@ -179,7 +238,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay to use.")
 
     # data loader
-    parser.add_argument("--batch_size", type=int, default=2)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,

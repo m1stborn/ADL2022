@@ -1,6 +1,7 @@
 import csv
 import json
 import uuid
+from itertools import chain
 from argparse import ArgumentParser, Namespace
 from typing import Dict
 from pathlib import Path
@@ -23,8 +24,7 @@ from transformers import (
 
 from dataset import CtxSleDataset, DataCollatorForMultipleChoice
 from utils_qa import postprocess_qa_predictions
-from utils import create_and_fill_np_array
-
+from utils import create_and_fill_np_array, data_collator
 
 # Pipeline:
 #   1. Context Selection: Select one related contex out of 4 candidate.
@@ -34,6 +34,8 @@ CONTEXT = "context"
 TEST = "test"
 SPLITS = [CONTEXT, TEST]
 UID = str(uuid.uuid1())
+
+accelerator = Accelerator()
 
 
 def main(args):
@@ -47,24 +49,70 @@ def main(args):
     ctx_sle_model.to(device)
     ctx_sle_model.resize_token_embeddings(len(tokenizer))
 
-    # TODO: Refactor test file name
+    # # TODO: Refactor test file name
     data_paths = {split: args.data_dir / f"{split}.json" for split in SPLITS}
     data = {split: json.loads(path.read_text(encoding='utf-8')) for split, path in data_paths.items()}
     context_data = data[CONTEXT]
+    #
+    # datasets: Dict[str, ] = {
+    #     split: CtxSleDataset(split_data, context_data, args.max_len, tokenizer, mode="test")
+    #     for split, split_data in data.items()
+    # }
 
-    datasets: Dict[str, ] = {
-        split: CtxSleDataset(split_data, context_data, args.max_len, tokenizer, mode="test")
-        for split, split_data in data.items()
-    }
-
-    data_collator = DataCollatorForMultipleChoice(
-        tokenizer, pad_to_multiple_of=8
-    )
+    # data_collator = DataCollatorForMultipleChoice(
+    #     tokenizer, pad_to_multiple_of=8
+    # )
     # Data
     # TODO: modify batch size
-    test_dataloader = DataLoader(
-        datasets[TEST], shuffle=False, collate_fn=data_collator, batch_size=32
-    )
+    # test_dataloader = DataLoader(
+    #     datasets[TEST], shuffle=False, collate_fn=data_collator, batch_size=32
+    # )
+
+    ending_names = [f"ending{i}" for i in range(4)]
+    padding = "max_length"
+
+    # (Context|Question)
+    def preprocess_function(examples):
+        batch_size = len(examples["question"])
+        # Question
+        first_sentences = [[context] * 4 for context in examples["question"]]
+        # Context
+        second_sentences = [
+            [examples[end][i] for end in ending_names] for i in range(batch_size)
+        ]
+
+        labels = examples["label"]
+
+        # Flatten out
+        first_sentences = list(chain(*first_sentences))
+        second_sentences = list(chain(*second_sentences))
+
+        # Tokenize
+        tokenized_examples = tokenizer(
+            second_sentences,
+            first_sentences,
+            max_length=args.max_len,
+            padding=padding,
+            truncation="only_first",
+        )
+
+        # Un-flatten
+        tokenized_inputs = {k: [v[i: i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()}
+        # tokenized_inputs["labels"] = labels
+
+        return tokenized_inputs
+    raw_test_dataset = load_dataset("ctx_sle.py", name="test", cache_dir="./cache2",
+                                    question_file="./data/test.json", context_file="./data/context.json")
+
+    test_dataset = raw_test_dataset["test"]
+    with accelerator.main_process_first():
+        test_dataset = test_dataset.map(
+            preprocess_function,
+            batched=True,
+            num_proc=args.preprocessing_num_workers,
+        )
+    test_dataloader = DataLoader(test_dataset, shuffle=False, collate_fn=data_collator, batch_size=8)
+
     # Testing
     all_ids = []
     all_paragraphs = []
@@ -73,6 +121,7 @@ def main(args):
     for step, batch in enumerate(test_dataloader):
         ids = batch.pop("ids")
         paragraphs = batch.pop("paragraphs")
+        _ = batch.pop("labels")
         data = {k: v.to(device) for k, v in batch.items()}
         with torch.no_grad():
             outputs = ctx_sle_model(**data)
@@ -82,15 +131,14 @@ def main(args):
         all_paragraphs += paragraphs
         all_pred.append(predicted)
 
+
     all_pred = torch.cat(all_pred).cpu().numpy()
     selected_context = {instance_id: paragraphs[contex_idx]
                         for instance_id, contex_idx, paragraphs in zip(all_ids, all_pred, all_paragraphs)}
     print(selected_context, len(selected_context))
 
     # 2. Question Answering
-    accelerator = Accelerator()
-
-    # config = AutoConfig.from_pretrained(args.model_name_or_path)
+    config = AutoConfig.from_pretrained(args.model_name_or_path)
 
     tokenizer = AutoTokenizer.from_pretrained(args.qa_ckpt)
     qa_model = AutoModelForQuestionAnswering.from_pretrained(args.qa_ckpt)
@@ -263,7 +311,7 @@ def parse_args() -> Namespace:
         help="Path to model checkpoint.",
         default="./ckpt/qa"
     )
-    parser.add_argument("--pred_file", type=Path, default="pred.csv")
+    parser.add_argument("--pred_file", type=Path, default="result.csv")
     parser.add_argument(
         "--preprocessing_num_workers", type=int, default=6,
         help="Num worker for preprocessing"
