@@ -1,4 +1,5 @@
 import math
+import uuid
 import os
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -23,6 +24,7 @@ from transformers import (
 
 from utils_qa import postprocess_qa_predictions
 
+UID = str(uuid.uuid1())
 
 def main(args):
     set_seed(1)
@@ -410,7 +412,7 @@ def parse_args() -> Namespace:
         "--model_name_or_path",
         type=str,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
-        default="bert-base-chinese",
+        default="hfl/chinese-roberta-wwm-ext",
     )
 
     # optimizer
@@ -418,7 +420,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay to use.")
 
     # data loader
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
@@ -442,6 +444,7 @@ def parse_args() -> Namespace:
 
 
 if __name__ == "__main__":
-    arges = parse_args()
-    arges.ckpt_dir.mkdir(parents=True, exist_ok=True)
-    main(arges)
+    args = parse_args()
+    args.ckpt_dir = Path(f"{args.ckpt_dir}/{UID[:8]}")
+    args.ckpt_dir.mkdir(parents=True, exist_ok=True)
+    main(args)

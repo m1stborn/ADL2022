@@ -91,7 +91,7 @@ def main(args):
         tokenized_examples = tokenizer(
             second_sentences,
             first_sentences,
-            max_length=args.max_len,
+            max_length=512,
             padding=padding,
             truncation="only_first",
         )
@@ -101,6 +101,7 @@ def main(args):
         # tokenized_inputs["labels"] = labels
 
         return tokenized_inputs
+
     raw_test_dataset = load_dataset("ctx_sle.py", name="test", cache_dir="./cache2",
                                     question_file="./data/test.json", context_file="./data/context.json")
 
@@ -130,7 +131,6 @@ def main(args):
         all_ids += ids
         all_paragraphs += paragraphs
         all_pred.append(predicted)
-
 
     all_pred = torch.cat(all_pred).cpu().numpy()
     selected_context = {instance_id: paragraphs[contex_idx]
@@ -303,15 +303,15 @@ def parse_args() -> Namespace:
         "--ctx_sle_ckpt",
         type=Path,
         help="Path to model checkpoint.",
-        default="./ckpt/ctx_sle"
+        default="./ckpt/ctx_sle/e86e88ce"
     )
     parser.add_argument(
         "--qa_ckpt",
         type=Path,
         help="Path to model checkpoint.",
-        default="./ckpt/qa"
+        default="./ckpt/qa/6cb2fbea"
     )
-    parser.add_argument("--pred_file", type=Path, default="result.csv")
+    parser.add_argument("--pred_file", type=Path, default="result.e86e88ce.6cb2fbea.csv")
     parser.add_argument(
         "--preprocessing_num_workers", type=int, default=6,
         help="Num worker for preprocessing"

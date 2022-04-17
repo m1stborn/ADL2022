@@ -37,18 +37,8 @@ def main(args):
     set_seed(1)
     accelerator = Accelerator()
 
-    # data_paths = {split: args.data_dir / f"{split}.json" for split in SPLITS}
-    # data = {split: json.loads(path.read_text(encoding='utf-8')) for split, path in data_paths.items()}
-    # context_data = data[CONTEXT]
-    # # TODO: slow tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
-    #
-    # datasets: Dict[str, ] = {
-    #     split: CtxSleDataset(split_data, context_data, args.max_len, tokenizer)
-    #     for split, split_data in data.items()
-    # }
 
-    # print(datasets[TRAIN][0])
     raw_train_dataset = load_dataset("ctx_sle.py", name="train", cache_dir="./cache2",
                                      question_file="./data/train.json", context_file="./data/context.json")
 
@@ -223,7 +213,7 @@ def parse_args() -> Namespace:
     )
 
     # data
-    parser.add_argument("--max_len", type=int, default=384)
+    parser.add_argument("--max_len", type=int, default=512)
 
     # model
     parser.add_argument(
@@ -238,7 +228,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay to use.")
 
     # data loader
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
@@ -262,5 +252,6 @@ def parse_args() -> Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
+    args.ckpt_dir = Path(f"{args.ckpt_dir}/{UID[:8]}")
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
     main(args)
