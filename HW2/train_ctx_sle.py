@@ -1,10 +1,8 @@
-import json
 import math
 import uuid
 from argparse import ArgumentParser, Namespace
-from pathlib import Path
-from typing import Dict
 from itertools import chain
+from pathlib import Path
 
 import torch
 from accelerate import Accelerator
@@ -19,67 +17,28 @@ from transformers import (
     SchedulerType,
     get_scheduler,
     set_seed,
-    default_data_collator,
 )
 
-# from dataset import CtxSleDataset, DataCollatorForMultipleChoice
-from ctx_sle import CtxSleDataset
-from utils import data_collator
+from utils_ctx_sle import data_collator, PreprocessCteSle
 
-CONTEXT = "context"
-TRAIN = "train"
-DEV = "valid"
-SPLITS = [CONTEXT, TRAIN, DEV]
+
 UID = str(uuid.uuid1())
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Using device:', DEVICE)
 
 
 def main(args):
     set_seed(1)
     accelerator = Accelerator()
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
-
+    # Dataset
     raw_train_dataset = load_dataset("ctx_sle.py", name="train", cache_dir="./cache2",
                                      question_file="./data/train.json", context_file="./data/context.json")
-
     raw_valid_dataset = load_dataset("ctx_sle.py", name="eval", cache_dir="./cache2",
                                      question_file="./data/valid.json", context_file="./data/context.json")
 
-    ending_names = [f"ending{i}" for i in range(4)]
-    padding = "max_length"
-
-    # (Context|Question)
-    def preprocess_function(examples):
-        batch_size = len(examples["question"])
-        # Question
-        first_sentences = [[context] * 4 for context in examples["question"]]
-        # Context
-        second_sentences = [
-            [examples[end][i] for end in ending_names] for i in range(batch_size)
-        ]
-
-        labels = examples["label"]
-
-        # Flatten out
-        first_sentences = list(chain(*first_sentences))
-        second_sentences = list(chain(*second_sentences))
-
-        # Tokenize
-        tokenized_examples = tokenizer(
-            # first_sentences,
-            # second_sentences,
-            second_sentences,
-            first_sentences,
-            max_length=args.max_len,
-            padding=padding,
-            truncation="only_first",
-        )
-
-        # Un-flatten
-        tokenized_inputs = {k: [v[i: i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()}
-        tokenized_inputs["labels"] = labels
-
-        return tokenized_inputs
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
+    preprocess_function = PreprocessCteSle(tokenizer, args.max_len)
 
     train_dataset = raw_train_dataset["train"]
     with accelerator.main_process_first():
@@ -98,27 +57,18 @@ def main(args):
         )
 
     train_dataloader = DataLoader(train_dataset, shuffle=True, collate_fn=data_collator, batch_size=args.batch_size)
-
     eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.batch_size)
-
-    # batch = next(iter(train_dataloader))
-    # print(batch)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('Using device:', device)
 
     # Model
     config = AutoConfig.from_pretrained(args.model_name_or_path)
     model = AutoModelForMultipleChoice.from_pretrained(
         args.model_name_or_path,
-        # from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
     )
-    model.to(device)
+    model.to(DEVICE)
     model.resize_token_embeddings(len(tokenizer))
 
     # Optimizer
-    # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -154,8 +104,7 @@ def main(args):
         for step, batch in epoch_pbar:
             _ = batch.pop("ids")
             _ = batch.pop("paragraphs")
-
-            data = {k: v.to(device) for k, v in batch.items()}
+            data = {k: v.to(DEVICE) for k, v in batch.items()}
 
             outputs = model(**data)
             loss = outputs.loss
@@ -181,7 +130,7 @@ def main(args):
         for step, batch in enumerate(eval_dataloader):
             _ = batch.pop("ids")
             _ = batch.pop("paragraphs")
-            data = {k: v.to(device) for k, v in batch.items()}
+            data = {k: v.to(DEVICE) for k, v in batch.items()}
             with torch.no_grad():
                 outputs = model(**data)
             predicted = outputs.logits.argmax(dim=-1)
@@ -195,12 +144,6 @@ def main(args):
 
 def parse_args() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument(
-        "--data_dir",
-        type=Path,
-        help="Directory to the dataset.",
-        default="./data/",
-    )
     parser.add_argument(
         "--ckpt_dir",
         type=Path,
