@@ -16,7 +16,7 @@ from transformers import (
 
 from utils_qa import create_and_fill_np_array, PreprocessQAValid
 from utils_ctx_sle import PreprocessCteSle, data_collator
-from utils_post import postprocess_qa_predictions
+from postprocess import postprocess_qa_predictions
 
 # Pipeline:
 #   1. Context Selection: Select one related contex out of 4 candidate.
@@ -46,7 +46,6 @@ def main(args):
         test_dataset = test_dataset.map(
             preprocess_ctx_sle_fn,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
         )
     test_dataloader = DataLoader(test_dataset, shuffle=False, collate_fn=data_collator, batch_size=8)
 
@@ -82,8 +81,6 @@ def main(args):
     # Dataset
     raw_test_dataset = load_dataset("qa.py", name="test",
                                     question_file=args.test_file, context_file=args.ctx_file)
-    # raw_test_dataset = load_dataset("qa.py", name="test", cache_dir="./cache2",
-    #                                 question_file="./data/test.json", context_file="./data/context.json")
 
     column_names = raw_test_dataset["test"].column_names
     context_data = json.loads(args.ctx_file.read_text(encoding='utf-8'))
@@ -101,8 +98,6 @@ def main(args):
         test_example = raw_test_dataset["test"].map(
             prepare_context,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
-            load_from_cache_file=False,
             desc="Running tokenizer on test dataset",
         )
     print("Test Example:", test_example[0])
@@ -112,9 +107,7 @@ def main(args):
         test_dataset = test_example.map(
             preprocess_qa_fn,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
             remove_columns=column_names,
-            load_from_cache_file=False,
             desc="Running tokenizer on test dataset",
         )
     print("Test Dataset:", test_dataset[0])
@@ -184,16 +177,9 @@ def parse_args() -> Namespace:
     parser.add_argument("--ctx_file", type=Path, default="./data/context.json")
     parser.add_argument("--pred_file", type=Path, default="result.csv")
 
-    # ckpt
-    parser.add_argument("--ctx_sle_ckpt", type=Path, default="./ckpt/ctx_sle/e86e88ce")
-    parser.add_argument("--qa_ckpt", type=Path, default="./ckpt/qa/79352469")
-    # parser.add_argument("--qa_ckpt", type=Path, default="./ckpt/qa/6cb2fbea")
-
-    # TODO: check reproduce env num worker
-    parser.add_argument(
-        "--preprocessing_num_workers", type=int, default=6,
-        help="Num worker for preprocessing"
-    )
+    # ckpt folder
+    parser.add_argument("--ctx_sle_ckpt", type=Path, default="./ckpt/ctx_sle")
+    parser.add_argument("--qa_ckpt", type=Path, default="./ckpt/qa")
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=32)

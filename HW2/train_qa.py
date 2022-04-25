@@ -22,7 +22,7 @@ from transformers import (
     set_seed
 )
 
-from utils_post import postprocess_qa_predictions
+from postprocess import postprocess_qa_predictions
 from utils_qa import (
     PreprocessQATrain,
     PreprocessQAValid,

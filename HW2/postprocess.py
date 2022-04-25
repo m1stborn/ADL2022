@@ -51,7 +51,7 @@ def postprocess_qa_predictions(
             The predictions of the model: two arrays containing the start logits and the end logits respectively. Its
             first dimension must match the number of elements of :obj:`features`.
         version_2_with_negative (:obj:`bool`, `optional`, defaults to :obj:`False`):
-            Whether or not the underlying dataset contains examples with no answers.
+            Whether the underlying dataset contains examples with no answers.
         n_best_size (:obj:`int`, `optional`, defaults to 20):
             The total number of n-best predictions to generate when looking for an answer.
         max_answer_length (:obj:`int`, `optional`, defaults to 30):

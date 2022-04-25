@@ -7,7 +7,7 @@ from transformers import (
     EvalPrediction,
 )
 
-from utils_post import postprocess_qa_predictions
+from postprocess import postprocess_qa_predictions
 
 
 @dataclass
@@ -192,24 +192,6 @@ def create_and_fill_np_array(start_or_end_logits, dataset, max_len):
 
     return logits_concat
 
-
-# def post_processing_function(examples, features, predictions, stage="eval"):
-#     # Post-processing: we match the start logits and end logits to answers in the original context.
-#     predictions = postprocess_qa_predictions(
-#         examples=examples,
-#         features=features,
-#         predictions=predictions,
-#         version_2_with_negative=False,
-#         n_best_size=20,
-#         max_answer_length=30,
-#         null_score_diff_threshold=0.0,
-#         output_dir=None,
-#         prefix=stage,
-#     )
-#
-#     formatted_predictions = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
-#
-#     return formatted_predictions
 
 def post_processing_function(examples, features, predictions, output_dir, stage="eval"):
     # Post-processing: we match the start logits and end logits to answers in the original context.
