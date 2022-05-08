@@ -163,17 +163,15 @@ def main(args):
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     logger.info(f"  Use fp 16: {accelerator.use_fp16}")
 
-    # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(args.max_train_steps), disable=not accelerator.is_local_main_process)
     completed_steps = 0
     starting_epoch = 0
 
     for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
         total_loss = 0
-        epoch_pbar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=100)
 
-        for step, batch in enumerate(train_dataloader):
+        epoch_pbar = tqdm(enumerate(train_dataloader), total=len(train_dataloader), ncols=100)
+        for step, batch in epoch_pbar:
             outputs = model(**batch)
             loss = outputs.loss
 
@@ -185,7 +183,6 @@ def main(args):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
-                progress_bar.update(1)
                 completed_steps += 1
 
                 # Set Progress Bar
@@ -193,6 +190,9 @@ def main(args):
                 epoch_pbar.set_postfix(loss=total_loss / (step + 1))
 
             if completed_steps >= args.max_train_steps:
+                break
+
+            if step == 30 and args.dev:
                 break
 
         # Evaluation per epoch
@@ -205,7 +205,12 @@ def main(args):
             "num_beams": args.num_beams,
         }
         samples_seen = 0
-        for step, batch in enumerate(eval_dataloader):
+
+        all_pred = []
+        all_label = []
+
+        epoch_pbar = tqdm(enumerate(eval_dataloader), total=len(eval_dataloader), ncols=100)
+        for step, batch in epoch_pbar:
             with torch.no_grad():
                 generated_tokens = accelerator.unwrap_model(model).generate(
                     batch["input_ids"],
@@ -234,26 +239,38 @@ def main(args):
                 decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
                 decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+                all_pred += decoded_preds
+                all_label += decoded_labels
                 # If we are in a multiprocess environment, the last batch has duplicates
-                if accelerator.num_processes > 1:
-                    if step == len(eval_dataloader):
-                        decoded_preds = decoded_preds[: len(eval_dataloader.dataset) - samples_seen]
-                        decoded_labels = decoded_labels[: len(eval_dataloader.dataset) - samples_seen]
-                    else:
-                        samples_seen += decoded_labels.shape[0]
+                # if accelerator.num_processes > 1:
+                #     if step == len(eval_dataloader):
+                #         decoded_preds = decoded_preds[: len(eval_dataloader.dataset) - samples_seen]
+                #         decoded_labels = decoded_labels[: len(eval_dataloader.dataset) - samples_seen]
+                #     else:
+                #         samples_seen += decoded_labels.shape[0]
 
                 metric.add_batch(
                     predictions=decoded_preds,
                     references=decoded_labels,
                 )
 
+                if step == 30 and args.dev:
+                    break
+
+            # Set Progress Bar
+            epoch_pbar.update(1)
+
+        print(f"Decode label: {all_label[:3]}")
+        print(f"Decode pred: {all_pred[:3]}")
+
         result = metric.compute(use_stemmer=True)
         # Extract a few results from ROUGE
         result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
         result = {k: round(v, 4) for k, v in result.items()}
-        logger.info(result)
+        print(f"Valid Metric: {result}")
 
-    if args.ckpt_dir is not None:
+    # Save checkpoint
+    if args.ckpt_dir is not None and not args.dev:
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
         unwrapped_model.save_pretrained(
@@ -334,6 +351,7 @@ def parse_args():
         type=str,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
         default="google/mt5-small"
+        # default="t5-small"
     )
     parser.add_argument(
         "--per_device_train_batch_size",
@@ -354,11 +372,11 @@ def parse_args():
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay to use.")
-    parser.add_argument("--num_train_epochs", type=int, default=3, help="Total number of training epochs to perform.")
+    parser.add_argument("--num_train_epochs", type=int, default=8, help="Total number of training epochs to perform.")
     parser.add_argument(
         "--max_train_steps",
         type=int,
-        default=1,
+        default=None,
         help="Total number of training steps to perform. If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
@@ -386,6 +404,8 @@ def parse_args():
     )
 
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/", help="Directory to save the model file.")
+
+    parser.add_argument("--dev", action="store_true")
 
     args = parser.parse_args()
 
