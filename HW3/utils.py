@@ -2,10 +2,8 @@ import json
 from dataclasses import dataclass
 
 import nltk
-import numpy as np
 from transformers import (
     PreTrainedTokenizerBase,
-    EvalPrediction,
 )
 
 
@@ -52,3 +50,10 @@ def postprocess_text(preds, labels):
     labels = ["\n".join(nltk.sent_tokenize(label)) for label in labels]
 
     return preds, labels
+
+
+def save_log(data, filename: str):
+    json_object = json.dumps(data, indent=4)
+
+    with open(filename, "w") as outfile:
+        outfile.write(json_object)

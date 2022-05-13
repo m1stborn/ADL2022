@@ -30,7 +30,7 @@ from transformers.utils import is_offline_mode
 
 from utils import (
     PreprocessTitleGenTrain,
-    postprocess_text,
+    postprocess_text, save_log,
 )
 
 logger = get_logger(__name__)
@@ -58,10 +58,6 @@ def main(args):
     logger.info(accelerator.state, main_process_only=False)
 
     set_seed(args.seed)
-    # Handle the repository creation
-    if accelerator.is_main_process:
-        os.makedirs(args.ckpt_dir, exist_ok=True)
-    accelerator.wait_for_everyone()
 
     dev_files = ["./data/train.jsonl", "./data/public.jsonl"]
     splits = ["train", "eval"]
@@ -84,7 +80,6 @@ def main(args):
         processed_datasets = raw_datasets.map(
             preprocess_function,
             batched=True,
-            num_proc=args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not args.overwrite_cache,
             desc="Running tokenizer on dataset",
@@ -165,6 +160,13 @@ def main(args):
 
     completed_steps = 0
     starting_epoch = 0
+    log = {
+        "train_loss": [],
+        "eval_rouge1": [],
+        "eval_rouge2": [],
+        "eval_rougeL": [],
+    }
+    result = {}
 
     for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
@@ -176,7 +178,7 @@ def main(args):
             loss = outputs.loss
 
             # We keep track of the loss at each epoch
-            total_loss += loss.detach().float()
+            total_loss += loss.item()
             loss = loss / args.gradient_accumulation_steps
             accelerator.backward(loss)
             if step % args.gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
@@ -241,13 +243,6 @@ def main(args):
                 decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
                 all_pred += decoded_preds
                 all_label += decoded_labels
-                # If we are in a multiprocess environment, the last batch has duplicates
-                # if accelerator.num_processes > 1:
-                #     if step == len(eval_dataloader):
-                #         decoded_preds = decoded_preds[: len(eval_dataloader.dataset) - samples_seen]
-                #         decoded_labels = decoded_labels[: len(eval_dataloader.dataset) - samples_seen]
-                #     else:
-                #         samples_seen += decoded_labels.shape[0]
 
                 metric.add_batch(
                     predictions=decoded_preds,
@@ -268,6 +263,11 @@ def main(args):
         result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
         result = {k: round(v, 4) for k, v in result.items()}
         print(f"Valid Metric: {result}")
+
+        log["train_loss"].append(total_loss / len(train_dataloader))
+        log["eval_rouge1"].append(result["rouge1"])
+        log["eval_rouge2"].append(result["rouge2"])
+        log["eval_rougeL"].append(result["rougeL"])
 
     # Save checkpoint
     if args.ckpt_dir is not None and not args.dev:
@@ -290,6 +290,8 @@ def main(args):
                 f,
             )
 
+        save_log(log, os.path.join(args.ckpt_dir, "log.json"))
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Finetune a transformers model on a summarization task")
@@ -298,12 +300,6 @@ def parse_args():
         type=bool,
         default=True,
         help="Whether to ignore the tokens corresponding to " "padded labels in the loss computation or not.",
-    )
-    parser.add_argument(
-        "--preprocessing_num_workers",
-        type=int,
-        default=None,
-        help="The number of processes to use for the preprocessing.",
     )
     parser.add_argument(
         "--overwrite_cache", type=bool, default=None, help="Overwrite the cached training and evaluation sets"
@@ -351,7 +347,6 @@ def parse_args():
         type=str,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
         default="google/mt5-small"
-        # default="t5-small"
     )
     parser.add_argument(
         "--per_device_train_batch_size",
@@ -396,12 +391,6 @@ def parse_args():
         "--num_warmup_steps", type=int, default=0, help="Number of steps for the warmup in the lr scheduler."
     )
     parser.add_argument("--seed", type=int, default=1, help="A seed for reproducible training.")
-    parser.add_argument(
-        "--checkpointing_steps",
-        type=str,
-        default=None,
-        help="Whether the various states should be saved at the end of every n steps, or 'epoch' for each epoch.",
-    )
 
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/", help="Directory to save the model file.")
 
