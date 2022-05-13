@@ -1,4 +1,3 @@
-import csv
 import json
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -7,18 +6,15 @@ import torch
 from accelerate import Accelerator
 from datasets import load_dataset
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from transformers import (
-    AutoModelForQuestionAnswering,
-    AutoModelForMultipleChoice,
     AutoTokenizer,
-    default_data_collator,
     set_seed,
     AutoConfig,
     AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq,
 )
 
 from utils import PreprocessTitleGenTrain
-
 
 accelerator = Accelerator()
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -33,25 +29,23 @@ def main(args):
     model.resize_token_embeddings(len(tokenizer))
 
     # Dataset
-    dev_files = ["./data/public.jsonl"]
-    splits = ["eval"]
+    dev_files = [args.test_file]
+    splits = ["test"]
     raw_datasets = load_dataset("title_gen.py", name="Title Gen",
                                 jsonl_files=dev_files, split_names=splits)
 
     # TODO: make utils function to keep id column
-    all_id = [features["id"] for features in raw_datasets["validation"]]
-    column_names = raw_datasets["validation"].column_names
+    all_id = [features["id"] for features in raw_datasets["test"]]
 
     preprocess_function = PreprocessTitleGenTrain(tokenizer=tokenizer)
     with accelerator.main_process_first():
         processed_datasets = raw_datasets.map(
             preprocess_function,
             batched=True,
-            remove_columns=column_names,
+            remove_columns=['id', 'article', 'highlights'],
             desc="Running tokenizer on dataset",
         )
-
-    eval_dataset = processed_datasets["validation"]
+    eval_dataset = processed_datasets["test"]
 
     data_collator = DataCollatorForSeq2Seq(
         tokenizer,
@@ -62,14 +56,21 @@ def main(args):
     eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=args.batch_size)
     model, eval_dataloader = accelerator.prepare(model, eval_dataloader)
 
+    # gen_kwargs = {
+    #     "max_length": args.max_target_length,
+    #     "num_beams": args.num_beams,
+    # }
     gen_kwargs = {
-        "max_length": args.max_target_length,
-        "num_beams": args.num_beams,
+         "max_length": args.max_target_length,
+         "num_beams": 4,
+         "num_return_sequences": 1,
+         "early_stopping": True,
     }
 
     # Testing
     all_pred = []
-    for step, batch in enumerate(eval_dataloader):
+    epoch_pbar = tqdm(enumerate(eval_dataloader), total=len(eval_dataloader), ncols=100)
+    for step, batch in epoch_pbar:
         with torch.no_grad():
             generated_tokens = accelerator.unwrap_model(model).generate(
                 batch["input_ids"],
