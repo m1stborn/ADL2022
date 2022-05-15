@@ -90,16 +90,16 @@ def main(args):
         #     "do_sample": True,
         #     "top_k": 50,
         # }
+        # {
+        #     "max_length": args.max_target_length,
+        #     "do_sample": True,
+        #     "top_k": 0,
+        #     "temperature": 0.9,
+        # },
         {
             "max_length": args.max_target_length,
             "do_sample": True,
-            "top_k": 0,
-            "temperature": 0.9,
-        },
-        {
-            "max_length": args.max_target_length,
-            "do_sample": True,
-            "top_k": 100,
+            "top_k": 30,
         }
     ]
     output_filenames = [
@@ -108,8 +108,8 @@ def main(args):
         # "./assets/result-beams_4.jsonl",
         # "./assets/result-temp_0.7.jsonl",
         # "./assets/result-top_50.jsonl",
-        "./assets/result-temp_0.9.jsonl",
-        "./assets/result-top_100.jsonl",
+        # "./assets/result-temp_0.9.jsonl",
+        "./assets/result-top_30.jsonl",
     ]
 
     # Testing
