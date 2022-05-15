@@ -63,40 +63,53 @@ def main(args):
     model, eval_dataloader = accelerator.prepare(model, eval_dataloader)
 
     gen_kwargs_set = [
-        {
-            "max_length": args.max_target_length,
-            "num_beams": args.num_beams,
-        },
-        {
-            "max_length": args.max_target_length,
-            "num_beams": 2,
-            "num_return_sequences": 1,
-            "early_stopping": True,
-        },
-        {
-            "max_length": args.max_target_length,
-            "num_beams": 4,
-            "num_return_sequences": 1,
-            "early_stopping": True,
-        },
+        # {
+        #     "max_length": args.max_target_length,
+        #     "num_beams": args.num_beams,
+        # },
+        # {
+        #     "max_length": args.max_target_length,
+        #     "num_beams": 2,
+        #     "num_return_sequences": 1,
+        #     "early_stopping": True,
+        # },
+        # {
+        #     "max_length": args.max_target_length,
+        #     "num_beams": 4,
+        #     "num_return_sequences": 1,
+        #     "early_stopping": True,
+        # },
+        # {
+        #     "max_length": args.max_target_length,
+        #     "do_sample": True,
+        #     "top_k": 0,
+        #     "temperature": 0.7,
+        # },
+        # {
+        #     "max_length": args.max_target_length,
+        #     "do_sample": True,
+        #     "top_k": 50,
+        # }
         {
             "max_length": args.max_target_length,
             "do_sample": True,
             "top_k": 0,
-            "temperature": 0.7,
+            "temperature": 0.9,
         },
         {
             "max_length": args.max_target_length,
             "do_sample": True,
-            "top_k": 50,
+            "top_k": 100,
         }
     ]
     output_filenames = [
-        "./assets/result-origin.jsonl",
-        "./assets/result-beams_2.jsonl",
-        "./assets/result-beams_4.jsonl",
-        "./assets/result-temp_0.7.jsonl",
-        "./assets/result-top_50.jsonl",
+        # "./assets/result-origin.jsonl",
+        # "./assets/result-beams_2.jsonl",
+        # "./assets/result-beams_4.jsonl",
+        # "./assets/result-temp_0.7.jsonl",
+        # "./assets/result-top_50.jsonl",
+        "./assets/result-temp_0.9.jsonl",
+        "./assets/result-top_100.jsonl",
     ]
 
     # Testing
