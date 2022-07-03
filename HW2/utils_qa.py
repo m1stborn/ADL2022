@@ -22,7 +22,7 @@ class PreprocessQATrain:
     answer_column_name: str = "answers"
 
     def __call__(self, examples):
-        # Some of the questions have lots of whitespace on the left, which is not useful and will make the
+        # Some questions have lots of whitespace on the left, which is not useful and will make the
         # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
         # left whitespace
         examples[self.question_column_name] = [q.lstrip() for q in examples[self.question_column_name]]

@@ -38,6 +38,7 @@ class PreprocessTitleGenTrain:
             ]
 
         model_inputs["labels"] = labels["input_ids"]
+        print(model_inputs)
         return model_inputs
 
 

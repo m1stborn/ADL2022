@@ -10,9 +10,19 @@ device = "cuda"
 model_id = "gpt2"
 model = GPT2LMHeadModel.from_pretrained(model_id).to(device)
 tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
+# in domain
+# prediction = load_dataset("text", data_files={"prediction": "./ckpt/concatenate.txt"})["prediction"]
+# prediction = load_dataset("text", data_files={"prediction": "./ckpt/ce4e62db/concatenate.txt"})["prediction"]
+prediction = load_dataset("text", data_files={"prediction": "./ckpt/3cfc44a3/concatenate.txt"})["prediction"]
+# perplexity: 39.95638656616211
+# sacrebleu: 8.014
 
-prediction = load_dataset("text", data_files={"prediction": sys.argv[1]})["prediction"]
+# out_of_domain
+# prediction = load_dataset("text", data_files={"prediction": "./ckpt/ebcef9a8/concatenate.txt"})["prediction"]
+# perplexity: 41.59463119506836
+# sacrebleu: 6.781
 
+print(prediction[0])
 loss = 0
 steps = 0
 nll = 0

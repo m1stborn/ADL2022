@@ -1,12 +1,17 @@
 import json
 import csv
 import os
+import uuid
+from pathlib import Path
+
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset
 from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM, DataCollatorForSeq2Seq
 from transformers import default_data_collator, Trainer, AutoModelForSeq2SeqLM, T5ForConditionalGeneration
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback
 from transformers.trainer_callback import EarlyStoppingCallback
+from transformers import IntervalStrategy
 import numpy as np
 from datasets import load_metric, load_dataset
 import argparse
@@ -15,6 +20,8 @@ tokenizer = AutoTokenizer.from_pretrained('t5-small')
 tokenizer.pad_token = tokenizer.eos_token
 max_input_length = 60
 max_target_length = 30
+
+UID = str(uuid.uuid1())
 
 
 def preprocess_function(examples):
@@ -36,7 +43,7 @@ def preprocess_function(examples):
     return model_inputs
 
 
-class OTTersDataset(torch.utils.data.Dataset):
+class OTTersDataset(Dataset):
     def __init__(self, tokenizer, data):
         tokenizer.pad_token = tokenizer.eos_token
         self.encodings = tokenizer(data['inputs'], padding=True, truncation=True)
@@ -72,7 +79,7 @@ def read_data(data_dir):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--dataset_root", default='OTTers/data', type=str, help="OTTers dir"
+        "--dataset_root", default='./OTTers/data', type=str, help="OTTers dir"
     )
     parser.add_argument(
         "--domain", default='in_domain', type=str, help="domain"
@@ -81,10 +88,10 @@ def parse_args():
         "--model_name_or_path", default='t5-small', type=str, help="model to finetune"
     )
     parser.add_argument(
-        "--output_dir", default='runs/finetune', type=str, help="dir to save finetuned model"
+        "--output_dir", default='./ckpt', type=str, help="dir to save finetuned model"
     )
     parser.add_argument(
-        "--max_epoch", default=10, type=int, help="total number of epoch"
+        "--max_epoch", default=20, type=int, help="total number of epoch"
     )
     parser.add_argument(
         "--train_bsize", default=16, type=int, help="training batch size"
@@ -96,20 +103,25 @@ def parse_args():
         "--patience", default=3, type=int, help="early stopping patience"
     )
     parser.add_argument(
-        "--ignore_pad_token_for_loss", default=3, type=int, help="early stopping patience"
+        "--ignore_pad_token_for_loss", default=True, type=bool
     )
+    parser.add_argument("--dev", default=False, type=bool)
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    arg = parse_args()
+    arg.output_dir = Path(f"{arg.output_dir}/{UID[:8]}")
+    if not arg.dev:
+        arg.output_dir.mkdir(parents=True, exist_ok=True)
+    arg.output_dir = str(arg.output_dir)
 
     # Dataset
     print('reading dataset')
-    dataset_dir = os.path.join(args.dataset_root, args.domain)
+    dataset_dir = os.path.join(arg.dataset_root, arg.domain)
     train_dataset, eval_dataset, test_dataset = read_data(dataset_dir)
-    model = T5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
+    model = T5ForConditionalGeneration.from_pretrained(arg.model_name_or_path)
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, label_pad_token_id=-100)
     metric = load_metric("sacrebleu")
 
@@ -127,7 +139,7 @@ if __name__ == "__main__":
             preds = preds[0]
         print(preds[0])
         decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-        if args.ignore_pad_token_for_loss:
+        if arg.ignore_pad_token_for_loss:
             # Replace -100 in the labels as we can't decode them.
             labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
@@ -146,17 +158,17 @@ if __name__ == "__main__":
 
     # Train model
     training_args = Seq2SeqTrainingArguments(
-        output_dir=args.output_dir,
+        output_dir=arg.output_dir,
         overwrite_output_dir=True,
-        evaluation_strategy="epoch",
-        logging_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=10,
+        evaluation_strategy=IntervalStrategy.EPOCH,
+        logging_strategy=IntervalStrategy.EPOCH,
+        save_strategy=IntervalStrategy.EPOCH,
+        save_total_limit=5,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
-        num_train_epochs=args.max_epoch,
-        per_device_train_batch_size=args.train_bsize,
-        per_device_eval_batch_size=args.eval_bsize,
+        num_train_epochs=arg.max_epoch,
+        per_device_train_batch_size=arg.train_bsize,
+        per_device_eval_batch_size=arg.eval_bsize,
         label_smoothing_factor=0.1,
         eval_accumulation_steps=10,
         # weight_decay=0.01,               # strength of weight decay
@@ -185,17 +197,45 @@ if __name__ == "__main__":
     # test
     model.to('cpu')
     inputs = tokenizer(test_dataset['inputs'], return_tensors="pt", padding=True)
+
+    input_sequences = tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
+
     output_sequences = model.generate(
         input_ids=inputs["input_ids"],
         attention_mask=inputs["attention_mask"],
     )
     predictions = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
     predictions = [pred.strip() for pred in predictions]
+
+    # For perplexity
+    raw = []
+    src_filename = os.path.join(dataset_dir, "test/source.csv")
+    with open(src_filename, encoding="utf-8") as file:
+        reader = csv.reader(file, delimiter=',')
+        for row in reader:
+            if not row:  # skip empty line
+                continue
+            raw.append((row[1], row[2]))
+
+    filename = os.path.join(training_args.output_dir, "concatenate.txt")
+    concat = [a[0] + b + a[1] for a, b in zip(raw, predictions)]
+    with open(filename, "w", encoding="utf-8") as writer:
+        writer.write("\n".join(concat))
+
     output_prediction_file = os.path.join(training_args.output_dir, "generated_predictions.txt")
     with open(output_prediction_file, "w", encoding="utf-8") as writer:
         writer.write("\n".join(predictions))
-    result = metric.compute(predictions=[predictions], references=test_dataset['target'])
-    result = {"bleu": result["score"]}
-    print(result)
+    # test_result = metric.compute(predictions=[predictions], references=test_dataset['target'])
+    test_result = metric.compute(predictions=[predictions], references=[test_dataset['target']])
+    test_result = {"bleu": test_result["score"]}
+    print(test_result)
 
-    trainer.save_model(args.output_dir)
+    trainer.save_model(arg.output_dir)
+
+    # sacrebleu .\OTTers\data\in_domain\test\text.txt -i .\ckpt\generated_predictions.txt -m bleu -b -w 3 --lowercase
+
+    # sacrebleu .\OTTers\data\out_of_domain\test\text.txt -i .\ckpt\87bc70f1\generated_predictions.txt  -m bleu -b -w 3 --lowercase
+    # score: {sacrebleu: 6.x, perplexity: 56}
+    # sacrebleu .\OTTers\data\out_of_domain\test\text.txt -i .\ckpt\f4dbaccb\generated_predictions.txt -m bleu -b -w 3 --lowercase
+
+    # sacrebleu .\OTTers\data\out_of_domain\test\text.txt -i .\ckpt\3204f8cd\generated_predictions.txt -m bleu -b -w 3 --lowercase

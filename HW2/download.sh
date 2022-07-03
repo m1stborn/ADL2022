@@ -13,4 +13,3 @@ wget --content-disposition --directory-prefix ckpt/qa https://www.dropbox.com/s/
 wget --content-disposition --directory-prefix ckpt/qa https://www.dropbox.com/s/7ulecazlil43i6i/special_tokens_map.json?dl=1
 wget --content-disposition --directory-prefix ckpt/qa https://www.dropbox.com/s/rbw90ifrug2t4eu/tokenizer_config.json?dl=1
 wget --content-disposition --directory-prefix ckpt/qa https://www.dropbox.com/s/ji0d3suggatc87q/vocab.txt?dl=1
-#wget --content-disposition --directory-prefix ckpt/qa https://www.dropbox.com/s/mlx4v8y3fp8elre/log.json?dl=1

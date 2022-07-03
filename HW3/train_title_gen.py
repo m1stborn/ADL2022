@@ -26,7 +26,7 @@ from transformers import (
     SchedulerType,
     get_scheduler,
 )
-from transformers.utils import is_offline_mode
+# from transformers.utils import is_offline_mode
 
 from utils import (
     PreprocessTitleGenTrain,
@@ -42,15 +42,15 @@ logging.basicConfig(
 UID = str(uuid.uuid1())
 
 # TODO: check tokenizer offline
-try:
-    nltk.data.find("tokenizers/punkt")
-except (LookupError, OSError):
-    if is_offline_mode():
-        raise LookupError(
-            "Offline mode: run this script without TRANSFORMERS_OFFLINE first to download nltk data files"
-        )
-    with FileLock(".lock") as lock:
-        nltk.download("punkt", quiet=True)
+# try:
+#     nltk.data.find("tokenizers/punkt")
+# except (LookupError, OSError):
+#     if is_offline_mode():
+#         raise LookupError(
+#             "Offline mode: run this script without TRANSFORMERS_OFFLINE first to download nltk data files"
+#         )
+#     with FileLock(".lock") as lock:
+#         nltk.download("punkt", quiet=True)
 
 
 def main(args):
@@ -87,7 +87,7 @@ def main(args):
 
     train_dataset = processed_datasets["train"]
     eval_dataset = processed_datasets["validation"]
-
+    print(train_dataset[0])
     # Log a few random samples from the training set:
     for index in random.sample(range(len(train_dataset)), 1):
         logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
