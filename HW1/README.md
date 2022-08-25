@@ -15,17 +15,17 @@ bash preprocess.sh
 ```
 
 # Intent Classification
-## Training
+### Training
 ```shell
 python train_intent.py
 ```
 
-## Inference
+### Inference
 ```shell
 bash intent_cls.sh <test_file> <path to predicion>
 ```
 
-## Model Performance
+### Model Performance
 | Model | Accuracy |
 |-------|----------|
 | BiGRU | 0.8902   |
@@ -33,17 +33,17 @@ bash intent_cls.sh <test_file> <path to predicion>
 
 # Slot Tagging
 
-## Training
+### Training
 ```shell
 python train_slot.py
 ```
 
-## Inference
+### Inference
 ```shell
 bash download.sh
 bash slot_tag.sh <test_file> <path to predicion>
 ```
-## Model Performance
+### Model Performance
 
 | Model  | Accuracy |
 |--------|----------|
