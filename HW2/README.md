@@ -1,44 +1,46 @@
-# Question Answering
-
-A two stage pipeline for Question Answering. 
-The first model is a Multiple Choice Model which will select a context that is relevant to the question out of four. 
-The second model is a Question Answering Model which generate answer span from the choosing context.
+# Intent Classification and Slot Tagging
 
 <!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
-    <li><a href="#ContextSelection">Context Selection</a></li>
-    <li><a href="#Question Answering">Question Answering</a></li>
+    <li><a href="#Preprocessing">Preprocessing</a></li>
+    <li><a href="#Intent-Classification">Intent Classification</a></li>
+    <li><a href="#Slot-Tagging">Slot Tagging</a></li>
 </details>
 
-# Context Selection
-## Training
+# Intent Classification
+### Training
 ```shell
-python train_ctx_sle.py
+python train_intent.py
 ```
 
-## Model Performance
-| Model             | Accuracy |
-|-------------------|----------|
-| bert-base-chinese | 0.95     |
-
-
-# Question Answering
-## Training
+### Inference
 ```shell
-python train_qa.py
+bash intent_cls.sh <test_file> <path to predicion>
 ```
 
-## Inference
+### Model Performance
+| Model | Accuracy |
+|-------|----------|
+| BiGRU | 0.8902   |
+
+
+# Slot Tagging
+
+### Training
+```shell
+python train_slot.py
+```
+
+### Inference
 ```shell
 bash download.sh
-bash run.sh <ctx_file.json> <path to predicion>
+bash slot_tag.sh <test_file> <path to predicion>
 ```
+### Model Performance
 
-## Model Performance
+| Model  | Accuracy |
+|--------|----------|
+| BiLSTM | 0.7973   |
 
-| Model                   | EM   |
-|-------------------------|------|
-| chinese-roberta-wwm-ext | 0.81 |
-
-###### tags: `NTU` `ADL` `2021`
+###### tags: `NTU` `ADL` `2022`

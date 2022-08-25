@@ -49,4 +49,4 @@ bash slot_tag.sh <test_file> <path to predicion>
 |--------|----------|
 | BiLSTM | 0.7973   |
 
-###### tags: `NTU` `ADL` `2021`
+###### tags: `NTU` `ADL` `2022`
